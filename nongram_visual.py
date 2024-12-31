@@ -54,6 +54,7 @@ def solve(field, rowhints, colhints):
     
     changed = True
     
+    
     # The simple heuristic goes in front because it will only be used once.
     for i, hint in enumerate(rowhints):
         # Simple heuristic: if the hints describe the row exactly,
@@ -178,10 +179,25 @@ def solve(field, rowhints, colhints):
                     if row[i] > -1:
                         row[i] = 1
                 changed = True
+        rows_needing_changed = []
+        cols_needing_changed = []
+        print("Checking row correctness")
         for i, row in enumerate(field):
-            if not check_gaps(row, rowhints[i]):
-                changed = True
-                ## MAKE SOME RANDOM CHANGE OPERATION OR MAKE SOME OTHER FUNCTIONALITY
+            if not check_line_gaps(row, rowhints[i], "row"):
+                # changed = True
+                if i not in rows_needing_changed:
+                    rows_needing_changed.append(i)
+        print("checking column correctness")
+        for i in range(len(field[0])):
+            column = [row[i] for row in field]
+            if not check_line_gaps(column, colhints[i], "column"):
+                # changed = True
+                if i not in cols_needing_changed:
+                    cols_needing_changed.append(i)
+        print(f"Bad rows found: {rows_needing_changed}")
+        print(f"Bad columns found: {cols_needing_changed}")
+
+        field, changed = try_fix_combinations(field, rows_needing_changed, cols_needing_changed, rowhints, colhints)
 
     # Once the nonogram is solved or the algorithm is out of ideas, it stops
     return field
@@ -192,85 +208,123 @@ def solve(field, rowhints, colhints):
 # The main purpose of the function that I created is to detect if the hint order matches up with the place it appear
 # for example a hint of [1,2] must be in the order of 1011 or 01011 NOT 1101 or 01101 etc...
 # This function is a bit more complex then I would have liked it too be, but it seems to work?
-def check_gaps(row, rowhints):
-    print(f"Row working withL {row}")
-    rows_match_hints = False # Just some pointless boolean tbh...
+def check_line_gaps(line, hints, line_type="row"):
+    print(f"{line_type} working with: {line}")
+    line_matches_hints = False  # Just some pointless boolean tbh...
 
-    current_hint = 0 # This keeps track of the current hint number in the hint row. EX [1,1] could have a current_hint of 0 or 1
+    current_hint = 0  # This keeps track of the current hint number in the hint line. EX [1,1] could have a current_hint of 0 or 1
 
-    row_index = 0 # This is to keep track of the last 1 checked. This helps to tell the program where to start next when checking the next hint number
-    # For example [0,1,1,0,1] when I run the program row_index starts at 0, then becomes 2, then 4 and the program stops.
+    line_index = 0  # This is to keep track of the last 1 checked. This helps to tell the program where to start next when checking the next hint number
+    # For example [0,1,1,0,1] when I run the program line_index starts at 0, then becomes 2, then 4 and the program stops.
 
-    # This while loop is technically infinite, but is neccessary to make sure all hints are checked.
-    while not rows_match_hints:
+    # This while loop is technically infinite, but is necessary to make sure all hints are checked.
+    while not line_matches_hints:
         count_ones = 0
         # All the print statements are for debugging, I will keep them just incase!
-        print(f"index: {row_index}")
-        print(f"row len: {len(row)}")
+        print(f"index: {line_index}")
+        print(f"{line_type} len: {len(line)}")
         print(f"current_hint_number: {current_hint}")
-        print(f"hint length: {rowhints}")
-        print(f"row: {row}")
+        print(f"hint length: {hints}")
+        print(f"{line_type}: {line}")
 
-        #Checks if the current_hint is sufficient. This means that if the current_hint is bigger then the rowhints length, we need to make sure the row is good
-        if current_hint >= len(rowhints):
-            for index, expel in enumerate(row[row_index:], start=row_index):
+        #Checks if the current_hint is sufficient. This means that if the current_hint is bigger then the hints length, we need to make sure the line is good
+        if current_hint >= len(hints):
+            for index, expel in enumerate(line[line_index:], start=line_index):
                 if expel == 1:
-                    print("failed")
+                    print("The current hint exceeds the current values: ie hint = 2 and the nonogram has 1,0")
                     return False
             return True
-            print("hello")
 
-        # more checking if the row is good -----------------------------
-        if row_index >= len(row) and current_hint < len(rowhints):
-            print("Things are not matching")
+        # more checking if the line is good -----------------------------
+        if line_index >= len(line) and current_hint < len(hints):
+            print("The hint and line index do not match")
             return False
-        if row_index >= len(row) and current_hint >= len(rowhints):
-            rows_match_hints = True
+        if line_index >= len(line) and current_hint >= len(hints):
+            line_matches_hints = True
             print("Hints and index match!")
             return True
         # --------------------------------------------------------------
 
-        # Using a while loop to keep track of thei value more 
-        while row_index < len(row):
-            row_n = row[row_index]
-            print(row_index)
-            print(row_n)
+        # Using a while loop to keep track of the value more 
+        while line_index < len(line):
+            line_n = line[line_index]
+            print(line_index)
+            print(line_n)
             # This checks for the first iteration. If 1 is not the first available value. This then moves the index to the first found 1 value
-            if row_index == 0 and row_n != 1:
+            if line_index == 0 and line_n != 1:
                 times_a_zero_or_neg1_appears = 0
-                while row[times_a_zero_or_neg1_appears] == 0 or row[times_a_zero_or_neg1_appears] == -1:
+                while line[times_a_zero_or_neg1_appears] == 0 or line[times_a_zero_or_neg1_appears] == -1:
                     print("Zero found")
-                    times_a_zero_or_neg1_appears+=1
-                    if times_a_zero_or_neg1_appears >= len(row)-1:
-                        return len(rowhints) == 0
-                row_index += times_a_zero_or_neg1_appears 
-                print(f"Current index after counting initial zeros: {row_index}")
-                row_n = row[row_index] # Setting current value to a one!
-                print(f"row_n value: {row_n}")
-            # Easy. if the row number is 1 then count it
-            if row_n == 1:
+                    times_a_zero_or_neg1_appears += 1
+                    if times_a_zero_or_neg1_appears >= len(line)-1:
+                        return len(hints) == 0
+                line_index += times_a_zero_or_neg1_appears 
+                print(f"Current index after counting initial zeros: {line_index}")
+                line_n = line[line_index]  # Setting current value to a one!
+                print(f"{line_type}_n value: {line_n}")
+            # Easy. if the line number is 1 then count it
+            if line_n == 1:
                 print("counting")
-                count_ones +=1
-            else: # Check for the number of 0's after the last 1. This is to account for any gap that might potentially
+                count_ones += 1
+            else:  # Check for the number of 0's after the last 1. This is to account for any gap that might potentially
                 # exist
                 print("Zero time")
-                # This for loop is for when there are large gaps of 0's or -1's in the row. THis helps find the next 1 for the next iteration
-                for j, count_zeros in enumerate(row[row_index:], start=row_index):
+                # This for loop is for when there are large gaps of 0's or -1's in the line. This helps find the next 1 for the next iteration
+                for j, count_zeros in enumerate(line[line_index:], start=line_index):
                     print(f"j value: {j}, count_zero value: {count_zeros}")
                     if count_zeros == 1:
-                        row_index = j 
+                        line_index = j 
                         break
-                print(f"{row_index} : Index")
+                print(f"{line_index} : Index")
                 print(f"count ones: {count_ones}")
                 break
-            row_index += 1
+            line_index += 1
         # This is another check statement. It checks to make sure the number of counted ones is the same as the hint says it is!
-        if count_ones != rowhints[current_hint]:
-            print(f"The counted ones dont match the hint: counted_ones: {count_ones}, hint ones:{rowhints[current_hint]} ")
+        if count_ones != hints[current_hint]:
+            print(f"The counted ones dont match the hint: counted_ones: {count_ones}, hint ones:{hints[current_hint]} ")
             return False
         current_hint += 1
-            
 
+def try_fix_combinations(field, rows_needing_changed, cols_needing_changed, rowhints, colhints):
+    if len(rows_needing_changed) < 1 or len(cols_needing_changed) < 1:
+        return field, False
+        
+    # Create a copy of the field to work with
+    working_field = [row[:] for row in field]
+    
+    # Try each combination of row and column
+    for row_idx in rows_needing_changed:
+        for col_idx in cols_needing_changed:
+            original_value = working_field[row_idx][col_idx]
+
+            working_field[row_idx][col_idx] = 1
+            
+            #Checking the row and column to see if it works
+            row_valid = check_line_gaps(working_field[row_idx], rowhints[row_idx], "row")
+            column = [row[col_idx] for row in working_field]
+            col_valid = check_line_gaps(column, colhints[col_idx], "column")
+            
+            #IF both are true then it is a valid change
+            if row_valid and col_valid:
+                field[row_idx][col_idx] = 1
+                return field, True
+                
+            #Some times a value needs to be set backwards
+            working_field[row_idx][col_idx] = -1
+            
+            row_valid = check_line_gaps(working_field[row_idx], rowhints[row_idx], "row")
+            column = [row[col_idx] for row in working_field]
+            col_valid = check_line_gaps(column, colhints[col_idx], "column")
+            
+            # Checking for valid solution
+            if row_valid and col_valid:
+                field[row_idx][col_idx] = -1
+                return field, True
+                
+            # If neither works restore the original value and continue
+            working_field[row_idx][col_idx] = original_value
+    
+    return field, False
 
 
 
@@ -317,7 +371,7 @@ for row in solved:
 
 print()
 field = [[0 for _ in range(4)] for _ in range(5)]
-rowhints = [[1,1],[2,1],[1], [1,2], [1]]
+rowhints = [[1,1],[2,1],[1], [1,2], [2]]
 colhints = [[2,1], [1], [1,3], [1,2]]
 solved = solve(field, rowhints, colhints)
 for row in solved:
